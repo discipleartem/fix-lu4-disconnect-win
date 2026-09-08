@@ -1,0 +1,5 @@
+# Local scratch (if any)
+*.log
+*.tmp
+.DS_Store
+Thumbs.db

@@ -2,16 +2,16 @@
 
 Lu4 Windows disconnect — NIC power-save/offload (Ethernet PC or WiFi notebook).
 
+## Human doc
+
+README.md — short RU guide: manual ncpa.cpl steps + optional Apply/Rollback scripts.
+
 ## Scripts (2)
 
 - Apply-Lu4EthernetNic.ps1 — read → snapshot → surgical known-good
 - Rollback-Lu4EthernetNic.ps1 — restore snapshot previousValue only
 
 -Media Auto|Ethernet|WiFi. Snapshot: %LOCALAPPDATA%\fix-lu4-disconnect-win\snapshot-<GUID>.json
-
-## Manual GUI
-
-README.md § «Ручная инструкция» — Windows 10/11: ncpa.cpl → adapter → Power Management + Advanced (Ethernet PC / WiFi notebook). Same known-good as scripts.
 
 ## Success
 

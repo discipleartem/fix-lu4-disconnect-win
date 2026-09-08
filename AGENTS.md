@@ -29,4 +29,4 @@ Black → Recommended → Black in Servers → **OK only** → character select;
 
 ## Files
 
-README.md (manual GUI + scripts) · Apply / Rollback ps1 · settings.known-good.json · settings.rollback-defaults.json · llms.txt
+README.md (simple RU manual + scripts) · Apply / Rollback ps1 · settings.known-good.json · settings.rollback-defaults.json · llms.txt

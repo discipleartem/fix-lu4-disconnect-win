@@ -1,154 +1,150 @@
 ﻿#requires -Version 5.1
 <#
 .SYNOPSIS
-  Apply known-good Realtek Ethernet NIC settings for Lu4 cold-login disconnect.
+  Rollback Realtek Ethernet NIC to typical defaults (undo Apply-Lu4EthernetNic).
 
 .DESCRIPTION
-  PROBLEM: Lu4 cold login disconnect on Ethernet after Servers OK (~2s TCP :9971 then drop).
-  FIX: Disable Realtek power-save/offload — EEE, GreenEthernet, LSO, RSC, checksum,
-       SelectiveSuspend, IdlePowerDown, ASPM=0, PnPCapabilities=24.
-  Root cause: Realtek Ethernet offload/power — NOT ISP/white IP.
-  Companion: Rollback-Lu4EthernetNic.ps1 | Targets: settings.known-good.json
-  Exit: 0 = applied; 1 = missing adapter or needs admin.
+  Restores typical Realtek/Windows defaults: EEE/Green ON, LSO/RSC/checksum ON,
+  SelectiveSuspend/IdlePowerDown ON, ASPM=1, PnPCapabilities=0,
+  AllowComputerToTurnOffDevice Enabled.
+  WARNING: may bring back Lu4 Ethernet disconnect on world :9971.
+  Companion: Apply-Lu4EthernetNic.ps1 | Targets: settings.rollback-defaults.json
+  Exit: 0 = done; 1 = missing adapter or needs admin.
 
 .PARAMETER Name
   NetAdapter Name (default: auto-detect Realtek Ethernet).
 
 .PARAMETER InterfaceDescription
-  Match InterfaceDescription (e.g. "Realtek PCIe GbE Family Controller").
-
-.PARAMETER DisableWifi
-  Optionally disable wireless adapters after apply (not required for the fix).
+  Match InterfaceDescription.
 
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File .\Apply-Lu4EthernetNic.ps1
+  powershell -ExecutionPolicy Bypass -File .\Rollback-Lu4EthernetNic.ps1
 #>
 [CmdletBinding()]
 param(
     [string]$Name,
-    [string]$InterfaceDescription,
-    [switch]$DisableWifi
+    [string]$InterfaceDescription
 )
 
-# Продолжать при некритичных ошибках отдельных свойств (драйвер может не экспонировать всё)
+# Продолжать при некритичных ошибках отдельных свойств
 $ErrorActionPreference = "Continue"
 
 # Путь класса сетевых адаптеров в реестре Windows
 $script:NicClassPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}"
-# PnPCapabilities=24 (0x18): запрет «разрешить отключение устройства для экономии энергии»
-$script:TargetPnPCapabilities = 24
+# PnPCapabilities=0 — типичный default (галка «разрешить отключение…» снова доступна)
+$script:TargetPnPCapabilities = 0
 
-# Список advanced-свойств NIC: keyword → значение 0 (выкл.) + алиасы для разных INF
+# Типичные defaults: keyword → значение ON + алиасы INF
 $script:AdvTargets = @(
     @{
         RegistryKeyword = "*EEE"
         AltKeywords     = @("EEE", "*EnergyEfficientEthernet")
         DisplayNames    = @("*Energy-Efficient Ethernet*", "*Energy Efficient Ethernet*", "*Энергоэффективный Ethernet*", "*EEE*")
-        Value           = "0"
-        Why             = "EEE OFF — энергосбережение линка; NIC «дремлет» → drop TCP :9971"
+        Value           = "1"
+        Why             = "EEE ON — типичный default"
     }
     @{
         RegistryKeyword = "*EEELinkAdvertisement"
         AltKeywords     = @("EEELinkAdvertisement")
         DisplayNames    = @("*EEE Link Advertisement*", "*EEE*Advert*", "*Реклам*EEE*", "*Объявлен*EEE*")
-        Value           = "0"
-        Why             = "EEE Link Advertisement OFF — дополнение к полному отключению EEE"
+        Value           = "1"
+        Why             = "EEE Link Advertisement ON"
     }
     @{
         RegistryKeyword = "*GreenEthernet"
         AltKeywords     = @("GreenEthernet", "*Green*")
         DisplayNames    = @("*Green Ethernet*", "*Зелёный Ethernet*", "*Зеленый Ethernet*", "*Энергосберегающий Ethernet*")
-        Value           = "0"
-        Why             = "Green Ethernet OFF — Realtek cable/power gating vs :9971"
+        Value           = "1"
+        Why             = "Green Ethernet ON"
     }
     @{
         RegistryKeyword = "GreenEthernet"
         AltKeywords     = @()
         DisplayNames    = @()
-        Value           = "0"
-        Why             = "Legacy GreenEthernet=0 (некоторые INF без звёздочки)"
+        Value           = "1"
+        Why             = "Legacy GreenEthernet=1"
     }
     @{
         RegistryKeyword = "*SelectiveSuspend"
         AltKeywords     = @("SelectiveSuspend", "*SS*")
         DisplayNames    = @("*Selective Suspend*", "*Выборочная приостановка*", "*Селективн*")
-        Value           = "0"
-        Why             = "Selective Suspend OFF — сон NIC в паузе login→world"
+        Value           = "1"
+        Why             = "Selective Suspend ON"
     }
     @{
         RegistryKeyword = "*IdlePowerDown"
         AltKeywords     = @("IdlePowerDown")
         DisplayNames    = @("*Idle Power*", "*Простой*питан*", "*Idle*Down*")
-        Value           = "0"
-        Why             = "Idle Power Down OFF — sleep между пакетами ломает world handshake"
+        Value           = "1"
+        Why             = "Idle Power Down ON"
     }
     @{
         RegistryKeyword = "*LsoV2IPv4"
         AltKeywords     = @("*LSO*IPv4*", "*LsoV2*IPv4*")
         DisplayNames    = @("*Large Send Offload*v2*IPv4*", "*LSO*v2*IPv4*", "*Большой объем отправки*IPv4*", "*Большой объём отправки*IPv4*")
-        Value           = "0"
-        Why             = "LSO v2 IPv4 OFF — HW-нарезка TCP на Realtek ломает игровой сеанс"
+        Value           = "1"
+        Why             = "LSO v2 IPv4 ON"
     }
     @{
         RegistryKeyword = "*LsoV2IPv6"
         AltKeywords     = @("*LSO*IPv6*", "*LsoV2*IPv6*")
         DisplayNames    = @("*Large Send Offload*v2*IPv6*", "*LSO*v2*IPv6*", "*Большой объем отправки*IPv6*", "*Большой объём отправки*IPv6*")
-        Value           = "0"
-        Why             = "LSO v2 IPv6 OFF — тот же риск HW-сегментации"
+        Value           = "1"
+        Why             = "LSO v2 IPv6 ON"
     }
     @{
         RegistryKeyword = "*RscIPv4"
         AltKeywords     = @("*RSC*IPv4*", "*RecvSegmentCoalescing*IPv4*")
         DisplayNames    = @("*Recv Segment Coalescing*IPv4*", "*Receive Segment Coalescing*IPv4*", "*RSC*IPv4*", "*Объединение сегментов*IPv4*")
-        Value           = "0"
-        Why             = "RSC IPv4 OFF — склейка RX портит тайминг :9971"
+        Value           = "1"
+        Why             = "RSC IPv4 ON"
     }
     @{
         RegistryKeyword = "*RscIPv6"
         AltKeywords     = @("*RSC*IPv6*", "*RecvSegmentCoalescing*IPv6*")
         DisplayNames    = @("*Recv Segment Coalescing*IPv6*", "*Receive Segment Coalescing*IPv6*", "*RSC*IPv6*", "*Объединение сегментов*IPv6*")
-        Value           = "0"
-        Why             = "RSC IPv6 OFF — тот же риск RX-coalesce"
+        Value           = "1"
+        Why             = "RSC IPv6 ON"
     }
     @{
         RegistryKeyword = "*TCPChecksumOffloadIPv4"
         AltKeywords     = @("*TCPChecksum*IPv4*")
         DisplayNames    = @("*TCP Checksum Offload*IPv4*", "*TCP*контрольной суммы*IPv4*", "*Проверка контрольной суммы TCP*IPv4*")
-        Value           = "0"
-        Why             = "TCP checksum OFF IPv4 — баги HW checksum на Realtek"
+        Value           = "3"
+        Why             = "TCP checksum Rx&Tx Enabled (типично 3)"
     }
     @{
         RegistryKeyword = "*TCPChecksumOffloadIPv6"
         AltKeywords     = @("*TCPChecksum*IPv6*")
         DisplayNames    = @("*TCP Checksum Offload*IPv6*", "*TCP*контрольной суммы*IPv6*", "*Проверка контрольной суммы TCP*IPv6*")
-        Value           = "0"
-        Why             = "TCP checksum OFF IPv6 — в том же known-good батче"
+        Value           = "3"
+        Why             = "TCP checksum Rx&Tx Enabled"
     }
     @{
         RegistryKeyword = "*UDPChecksumOffloadIPv4"
         AltKeywords     = @("*UDPChecksum*IPv4*")
         DisplayNames    = @("*UDP Checksum Offload*IPv4*", "*UDP*контрольной суммы*IPv4*", "*Проверка контрольной суммы UDP*IPv4*")
-        Value           = "0"
-        Why             = "UDP checksum OFF IPv4 — часть known-good offload batch"
+        Value           = "3"
+        Why             = "UDP checksum Rx&Tx Enabled"
     }
     @{
         RegistryKeyword = "*UDPChecksumOffloadIPv6"
         AltKeywords     = @("*UDPChecksum*IPv6*")
         DisplayNames    = @("*UDP Checksum Offload*IPv6*", "*UDP*контрольной суммы*IPv6*", "*Проверка контрольной суммы UDP*IPv6*")
-        Value           = "0"
-        Why             = "UDP checksum OFF IPv6 — часть known-good offload batch"
+        Value           = "3"
+        Why             = "UDP checksum Rx&Tx Enabled"
     }
     @{
         RegistryKeyword = "*IPChecksumOffloadIPv4"
         AltKeywords     = @("*IPChecksumOffload*", "*IPChecksum*")
         DisplayNames    = @("*IP Checksum Offload*", "*IP*контрольной суммы*", "*Проверка контрольной суммы IP*")
-        Value           = "0"
-        Why             = "IP checksum OFF IPv4 — часть known-good offload batch"
+        Value           = "3"
+        Why             = "IP checksum Rx&Tx Enabled"
     }
 )
 
 function Get-Lu4OsInfo {
-    # Считать версию ОС (Win10 vs Win11 по build)
+    # Считать версию ОС
     $envVer = [Environment]::OSVersion.Version
     $cim = $null
     try { $cim = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop } catch {}
@@ -166,16 +162,15 @@ function Get-Lu4OsInfo {
 }
 
 function Write-Lu4OsBanner {
-    # Показать баннер ОС — один канон для Win10 и Win11
+    # Показать баннер ОС
     $os = Get-Lu4OsInfo
     Write-Host ("OS: {0} | Family={1} | Version={2} | Build={3} | Arch={4}" -f `
         $os.Caption, $os.Family, $os.Version, $os.Build, $os.Architecture)
-    Write-Host "Supported: Windows 10 and Windows 11 (same script / same known-good NIC settings)."
     return $os
 }
 
 function Test-IsAdmin {
-    # Проверка прав администратора (нужны для реестра и Disable-NetAdapter*)
+    # Проверка прав администратора
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
     $p = New-Object Security.Principal.WindowsPrincipal($id)
     return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -206,7 +201,7 @@ function Resolve-EthernetAdapter {
         return $hit
     }
 
-    # Авто-поиск Realtek Ethernet (не WiFi)
+    # Авто-поиск Realtek Ethernet
     $eth = @(
         $all | Where-Object {
             $_.InterfaceDescription -match "Realtek.*GbE|Realtek.*Ethernet|PCIe GbE" -and
@@ -239,7 +234,7 @@ function Resolve-EthernetAdapter {
 
 function Get-NicRegPath {
     param([string]$InterfaceGuid)
-    # Найти ветку Class\{4d36e972…}\NNNN по NetCfgInstanceId = GUID адаптера
+    # Найти ветку Class по NetCfgInstanceId
     $guidNorm = $InterfaceGuid.Trim("{}")
     Get-ChildItem $script:NicClassPath -ErrorAction Stop | ForEach-Object {
         try {
@@ -253,7 +248,7 @@ function Get-NicRegPath {
 
 function Get-RegValueSafe {
     param([string]$Path, [string]$Name)
-    # Безопасное чтение значения реестра (null если нет)
+    # Безопасное чтение значения реестра
     try {
         $v = (Get-ItemProperty -Path $Path -Name $Name -ErrorAction Stop).$Name
         if ($v -is [array]) { return ($v -join ",") }
@@ -273,7 +268,7 @@ function Find-AdvProperty {
     $hit = Get-NetAdapterAdvancedProperty -Name $AdapterName -RegistryKeyword $kw -ErrorAction SilentlyContinue
     if ($hit) { return $hit }
 
-    # Все advanced-свойства адаптера для поиска по алиасам
+    # Все advanced-свойства для поиска по алиасам
     $all = $null
     try { $all = @(Get-NetAdapterAdvancedProperty -Name $AdapterName -ErrorAction Stop) } catch { return $null }
     if (-not $all -or $all.Count -eq 0) { return $null }
@@ -292,7 +287,7 @@ function Find-AdvProperty {
         if ($hit) { return $hit }
     }
 
-    # Мягкий поиск по stem без ведущей *
+    # Мягкий поиск по stem
     $stem = $kw.TrimStart("*")
     if ($stem.Length -ge 3) {
         $hit = $all | Where-Object { $_.RegistryKeyword -like "*$stem*" } | Select-Object -First 1
@@ -303,68 +298,29 @@ function Find-AdvProperty {
 
 function Test-ValueMatches {
     param($Raw, [string]$Want)
-    # Сравнить текущее значение с целевым (учитывая "0,0,…" и одиночное)
+    # Сравнить текущее значение с целевым
     if ($null -eq $Raw) { return $false }
     $s = ([string]$Raw).Trim()
     if ($s -eq $Want) { return $true }
-    if ($Want -eq "0" -and $s -match "^(0)(,\s*0)*$") { return $true }
     return $false
 }
 
 function Show-AdapterState {
     param($Adapter, [string]$RegPath, [string]$Label)
 
-    # Дамп текущего состояния адаптера (до/после Apply)
+    # Дамп состояния адаптера
     Write-Host ""
     Write-Host "======== $Label ========"
     Write-Host ("Name={0}" -f $Adapter.Name)
     Write-Host ("Desc={0}" -f $Adapter.InterfaceDescription)
     Write-Host ("Status={0} Link={1} IfIndex={2}" -f $Adapter.Status, $Adapter.LinkSpeed, $Adapter.ifIndex)
-    Write-Host ("Guid={0}" -f $Adapter.InterfaceGuid)
 
     if ($RegPath) {
-        # PnPCapabilities и ASPM из реестра
+        # PnPCapabilities и ASPM
         $pnp = Get-RegValueSafe -Path $RegPath -Name "PnPCapabilities"
         $aspm = Get-RegValueSafe -Path $RegPath -Name "ASPM"
-        Write-Host ("PnPCapabilities={0} (target={1})" -f $(if ($null -eq $pnp -or $pnp -eq "") { "<empty>" } else { $pnp }), $script:TargetPnPCapabilities)
-        Write-Host ("ASPM={0} (target=0)" -f $(if ($null -eq $aspm) { "<missing>" } else { $aspm }))
-        foreach ($t in $script:AdvTargets) {
-            $adv = Find-AdvProperty -AdapterName $Adapter.Name -Target $t
-            if ($adv) {
-                Write-Host ("  {0}={1}  [DisplayName={2}]" -f $adv.RegistryKeyword, ($adv.RegistryValue -join ","), $adv.DisplayName)
-            } else {
-                $v = Get-RegValueSafe -Path $RegPath -Name $t.RegistryKeyword
-                if ($null -ne $v) {
-                    Write-Host ("  {0}={1}  [REG only]" -f $t.RegistryKeyword, $v)
-                }
-            }
-        }
-    } else {
-        Write-Host "WARN: NIC class registry path not found for this GUID."
-    }
-
-    # Слой cmdlet: LSO / RSC / Checksum
-    try {
-        $lso = Get-NetAdapterLso -Name $Adapter.Name -ErrorAction Stop
-        Write-Host ("LSO IPv4Enabled={0} IPv6Enabled={1}" -f $lso.IPv4Enabled, $lso.IPv6Enabled)
-    } catch {
-        Write-Host "LSO: (query unavailable)"
-    }
-    try {
-        $rsc = Get-NetAdapterRsc -Name $Adapter.Name -ErrorAction Stop
-        Write-Host ("RSC IPv4Enabled={0} IPv6Enabled={1}" -f $rsc.IPv4Enabled, $rsc.IPv6Enabled)
-    } catch {
-        Write-Host "RSC: (query unavailable)"
-    }
-    try {
-        $csum = Get-NetAdapterChecksumOffload -Name $Adapter.Name -ErrorAction SilentlyContinue
-        if ($csum) {
-            Write-Host ("ChecksumOffload present (TcpIPv4={0})" -f $csum.TcpIPv4Enabled)
-        } else {
-            Write-Host "ChecksumOffload: (none / disabled)"
-        }
-    } catch {
-        Write-Host "ChecksumOffload: (query unavailable)"
+        Write-Host ("PnPCapabilities={0} (rollback target={1})" -f $(if ($null -eq $pnp -or $pnp -eq "") { "<empty>" } else { $pnp }), $script:TargetPnPCapabilities)
+        Write-Host ("ASPM={0} (rollback target=1)" -f $(if ($null -eq $aspm) { "<missing>" } else { $aspm }))
     }
 }
 
@@ -374,25 +330,29 @@ function Set-AdvOrReg {
         [string]$RegPath,
         [hashtable]$Target
     )
-    # Применить одно advanced-свойство через cmdlet или напрямую в реестр
+    # Восстановить одно advanced-свойство к типичному default
     $want = $Target.Value
     $adv = Find-AdvProperty -AdapterName $AdapterName -Target $Target
     if ($adv) {
         $kw = [string]$adv.RegistryKeyword
         $cur = ($adv.RegistryValue -join ",")
         if (Test-ValueMatches $cur $want) {
-            Write-Step ("OK already ADV {0}={1} ({2})" -f $kw, $want, $adv.DisplayName)
+            Write-Step ("OK already ADV {0}={1}" -f $kw, $want)
             return
         }
-        # Запись через Set-NetAdapterAdvancedProperty (без рестарта адаптера)
+        # Запись через Set-NetAdapterAdvancedProperty
         Set-NetAdapterAdvancedProperty -Name $AdapterName -RegistryKeyword $kw -RegistryValue $want -NoRestart -ErrorAction Stop
         Write-Step ("SET ADV {0}={1} — {2}" -f $kw, $want, $Target.Why)
         return
     }
 
-    # Fallback: ключ только в реестре (свойство не в UI драйвера)
+    # Fallback в реестр, если ключ уже есть
     $kw = $Target.RegistryKeyword
     $had = Get-RegValueSafe -Path $RegPath -Name $kw
+    if ($null -eq $had) {
+        Write-Step ("SKIP REG {0} (absent on this INF)" -f $kw)
+        return
+    }
     if (Test-ValueMatches $had $want) {
         Write-Step ("OK already REG {0}={1}" -f $kw, $want)
         return
@@ -402,23 +362,22 @@ function Set-AdvOrReg {
 }
 
 # --- main ---
-Write-Host "=== Apply-Lu4EthernetNic ==="
-Write-Host "Lu4 Realtek Ethernet known-good (EEE/Green/LSO/RSC/checksum/PnPCapabilities=24)"
-Write-Host "Root cause: NIC power-save/offload on Ethernet — not ISP/IP."
+Write-Host "=== Rollback-Lu4EthernetNic ==="
+Write-Host "Restore typical Realtek Ethernet defaults (undo known-good Apply)."
+Write-Host "WARNING: may bring back Lu4 disconnect on Ethernet world :9971."
 Write-Host ""
 $null = Write-Lu4OsBanner
 Write-Host ""
 
-# Apply требует Elevation
+# Rollback требует Elevation
 $isAdmin = Test-IsAdmin
 if (-not $isAdmin) {
-    Write-Host "ERROR: Run elevated (Administrator). Registry + Disable-NetAdapterLso need admin."
-    Write-Host "Example:"
-    Write-Host '  powershell -ExecutionPolicy Bypass -File .\Apply-Lu4EthernetNic.ps1'
+    Write-Host "ERROR: Run elevated (Administrator)."
+    Write-Host '  powershell -ExecutionPolicy Bypass -File .\Rollback-Lu4EthernetNic.ps1'
     exit 1
 }
 
-# Найти Ethernet-адаптер и его ветку в реестре Class
+# Найти Ethernet-адаптер и ветку реестра
 $adapter = Resolve-EthernetAdapter -Name $Name -InterfaceDescription $InterfaceDescription
 $regPath = Get-NicRegPath -InterfaceGuid ([string]$adapter.InterfaceGuid)
 if (-not $regPath) {
@@ -426,13 +385,13 @@ if (-not $regPath) {
     exit 1
 }
 
-# Состояние ДО применения
-Show-AdapterState -Adapter $adapter -RegPath $regPath -Label "BEFORE"
+# Состояние ДО отката
+Show-AdapterState -Adapter $adapter -RegPath $regPath -Label "BEFORE ROLLBACK"
 
 Write-Host ""
-Write-Step "Applying known-good settings (idempotent)..."
+Write-Step "Restoring typical defaults..."
 
-# Выключить все advanced-свойства из known-good списка
+# Включить advanced-свойства к типичным defaults
 foreach ($t in $script:AdvTargets) {
     try {
         Set-AdvOrReg -AdapterName $adapter.Name -RegPath $regPath -Target $t
@@ -441,7 +400,7 @@ foreach ($t in $script:AdvTargets) {
     }
 }
 
-# PnPCapabilities=24 — запрет отключения устройства Windows для экономии энергии
+# PnPCapabilities=0 — снова разрешить отключение для экономии энергии
 $oldPnP = Get-RegValueSafe -Path $regPath -Name "PnPCapabilities"
 $pnpMsg = "PnPCapabilities '{0}' -> {1}" -f $(if ($null -eq $oldPnP -or $oldPnP -eq "") { "<empty>" } else { $oldPnP }), $script:TargetPnPCapabilities
 if ([string]$oldPnP -eq [string]$script:TargetPnPCapabilities) {
@@ -451,16 +410,16 @@ if ([string]$oldPnP -eq [string]$script:TargetPnPCapabilities) {
     Write-Step ("SET {0}" -f $pnpMsg)
 }
 
-# ASPM=0 — выкл. PCIe Active State Power Management
+# ASPM=1 — типичный enabled
 $oldAspm = Get-RegValueSafe -Path $regPath -Name "ASPM"
-if ($oldAspm -eq "0") {
-    Write-Step "OK already ASPM=0"
+if ($oldAspm -eq "1") {
+    Write-Step "OK already ASPM=1"
 } else {
-    New-ItemProperty -Path $regPath -Name ASPM -PropertyType String -Value "0" -Force | Out-Null
-    Write-Step "SET ASPM=0"
+    New-ItemProperty -Path $regPath -Name ASPM -PropertyType String -Value "1" -Force | Out-Null
+    Write-Step "SET ASPM=1"
 }
 
-# Если адаптер был Disabled — включить перед cmdlet-слоем
+# Если адаптер Disabled — включить перед Enable-cmdlets
 try {
     if ($adapter.Status -eq "Disabled") {
         Enable-NetAdapter -Name $adapter.Name -Confirm:$false -ErrorAction Stop
@@ -472,67 +431,39 @@ try {
     Write-Step ("Enable-NetAdapter: {0}" -f $_)
 }
 
-# Cmdlet: выключить Large Send Offload
+# Cmdlet: включить Large Send Offload
 try {
-    Disable-NetAdapterLso -Name $adapter.Name -Confirm:$false -ErrorAction Stop
-    Write-Step "Disable-NetAdapterLso OK"
-} catch { Write-Step ("Disable-NetAdapterLso: {0}" -f $_) }
+    Enable-NetAdapterLso -Name $adapter.Name -Confirm:$false -ErrorAction Stop
+    Write-Step "Enable-NetAdapterLso OK"
+} catch { Write-Step ("Enable-NetAdapterLso: {0}" -f $_) }
 
-# Cmdlet: выключить Receive Segment Coalescing
+# Cmdlet: включить Receive Segment Coalescing
 try {
-    Disable-NetAdapterRsc -Name $adapter.Name -Confirm:$false -ErrorAction Stop
-    Write-Step "Disable-NetAdapterRsc OK"
-} catch { Write-Step ("Disable-NetAdapterRsc: {0}" -f $_) }
+    Enable-NetAdapterRsc -Name $adapter.Name -Confirm:$false -ErrorAction Stop
+    Write-Step "Enable-NetAdapterRsc OK"
+} catch { Write-Step ("Enable-NetAdapterRsc: {0}" -f $_) }
 
-# Cmdlet: выключить checksum offload
+# Cmdlet: включить checksum offload
 try {
-    Disable-NetAdapterChecksumOffload -Name $adapter.Name -Confirm:$false -ErrorAction Stop
-    Write-Step "Disable-NetAdapterChecksumOffload OK"
-} catch { Write-Step ("Disable-NetAdapterChecksumOffload: {0}" -f $_) }
+    Enable-NetAdapterChecksumOffload -Name $adapter.Name -Confirm:$false -ErrorAction Stop
+    Write-Step "Enable-NetAdapterChecksumOffload OK"
+} catch { Write-Step ("Enable-NetAdapterChecksumOffload: {0}" -f $_) }
 
-# Cmdlet: запретить Windows гасить NIC + отключить Wake-on-*
+# Cmdlet: снова разрешить Windows гасить NIC
 try {
     Set-NetAdapterPowerManagement -Name $adapter.Name `
-        -AllowComputerToTurnOffDevice Disabled `
-        -WakeOnMagicPacket Disabled `
-        -WakeOnPattern Disabled `
+        -AllowComputerToTurnOffDevice Enabled `
         -Confirm:$false -ErrorAction Stop
-    Write-Step "Set-NetAdapterPowerManagement AllowComputerToTurnOffDevice=Disabled"
+    Write-Step "Set-NetAdapterPowerManagement AllowComputerToTurnOffDevice=Enabled"
 } catch { Write-Step ("Set-NetAdapterPowerManagement: {0}" -f $_) }
 
-# Опционально: выключить WiFi (не часть фикса Ethernet)
-if ($DisableWifi) {
-    Write-Host ""
-    Write-Step "-DisableWifi: disabling wireless adapters (optional; NOT required for Ethernet fix)"
-    $wifiList = @(
-        Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object {
-            $_.Status -ne "Not Present" -and
-            ($_.InterfaceDescription -match "Wireless|Wi-?Fi|802\.11" -or $_.Name -match "Wi-?Fi|WLAN|Беспровод")
-        }
-    )
-    foreach ($w in $wifiList) {
-        try {
-            Disable-NetAdapter -Name $w.Name -Confirm:$false -ErrorAction Stop
-            Write-Step ("Disabled WiFi '{0}'" -f $w.Name)
-        } catch {
-            Write-Step ("Disable WiFi '{0}': {1}" -f $w.Name, $_)
-        }
-    }
-} else {
-    Write-Step "WiFi left unchanged (pass -DisableWifi only if you want Ethernet-only)."
-}
-
-# Состояние ПОСЛЕ применения
+# Состояние ПОСЛЕ отката
 $adapter = Get-NetAdapter -Name $adapter.Name -ErrorAction SilentlyContinue
 if ($adapter) {
-    Show-AdapterState -Adapter $adapter -RegPath $regPath -Label "AFTER"
+    Show-AdapterState -Adapter $adapter -RegPath $regPath -Label "AFTER ROLLBACK"
 }
 
 Write-Host ""
 Write-Host "=== Done ==="
-Write-Host "Verify Lu4: E-Net OFF, Ethernet up → faction Black → Recommended → select Black in Servers → OK → character select."
-Write-Host "(After Black is selected in the server list, press OK only — do not pick Black again.)"
-Write-Host "TCP check: world :9971 Established >= 20s."
-Write-Host "After NIC driver update on Win10 or Win11: re-run this script."
-Write-Host "Rollback (restore defaults): .\Rollback-Lu4EthernetNic.ps1"
+Write-Host "Typical defaults restored. Re-apply fix: .\Apply-Lu4EthernetNic.ps1"
 exit 0

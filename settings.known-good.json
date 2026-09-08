@@ -1,34 +1,54 @@
 {
   "schema": "lu4-ethernet-nic-known-good/v1",
+  "role": "apply-targets",
+  "keywords": [
+    "Lu4", "Lineage", "disconnect", "Realtek", "Ethernet",
+    "LSO", "RSC", "EEE", "GreenEthernet", "checksum", "offload",
+    "PnPCapabilities", "ASPM", "SelectiveSuspend", "IdlePowerDown",
+    "Windows 10", "Windows 11", "cold login", "9971"
+  ],
   "adapterHint": "Realtek PCIe GbE Family Controller (RTL8168)",
   "rootCause": "Realtek Ethernet power-save and HW offloads (not ISP/IP ban)",
   "registryClassPath": "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}",
   "registry": {
-    "PnPCapabilities": { "type": "DWord", "value": 24, "why": "Forbid allow-computer-to-turn-off-this-device" },
-    "ASPM": { "type": "String", "value": "0", "optional": true, "why": "PCIe Active State Power Management OFF" }
+    "PnPCapabilities": {
+      "type": "DWord",
+      "value": 24,
+      "why": "Forbid allow-computer-to-turn-off-this-device"
+    },
+    "ASPM": {
+      "type": "String",
+      "value": "0",
+      "optional": true,
+      "why": "PCIe Active State Power Management OFF"
+    }
   },
   "advancedProperties": [
-    { "registryKeyword": "*EEE", "value": "0" },
-    { "registryKeyword": "*EEELinkAdvertisement", "value": "0" },
-    { "registryKeyword": "*GreenEthernet", "value": "0" },
-    { "registryKeyword": "GreenEthernet", "value": "0" },
-    { "registryKeyword": "*SelectiveSuspend", "value": "0" },
-    { "registryKeyword": "*IdlePowerDown", "value": "0" },
-    { "registryKeyword": "*LsoV2IPv4", "value": "0" },
-    { "registryKeyword": "*LsoV2IPv6", "value": "0" },
-    { "registryKeyword": "*RscIPv4", "value": "0" },
-    { "registryKeyword": "*RscIPv6", "value": "0" },
-    { "registryKeyword": "*TCPChecksumOffloadIPv4", "value": "0" },
-    { "registryKeyword": "*TCPChecksumOffloadIPv6", "value": "0" },
-    { "registryKeyword": "*UDPChecksumOffloadIPv4", "value": "0" },
-    { "registryKeyword": "*UDPChecksumOffloadIPv6", "value": "0" },
-    { "registryKeyword": "*IPChecksumOffloadIPv4", "value": "0" }
+    { "registryKeyword": "*EEE", "value": "0", "meaning": "Energy-Efficient Ethernet OFF" },
+    { "registryKeyword": "*EEELinkAdvertisement", "value": "0", "meaning": "EEE Link Advertisement OFF" },
+    { "registryKeyword": "*GreenEthernet", "value": "0", "meaning": "Green Ethernet OFF" },
+    { "registryKeyword": "GreenEthernet", "value": "0", "meaning": "Legacy GreenEthernet OFF" },
+    { "registryKeyword": "*SelectiveSuspend", "value": "0", "meaning": "Selective Suspend OFF" },
+    { "registryKeyword": "*IdlePowerDown", "value": "0", "meaning": "Idle Power Down OFF" },
+    { "registryKeyword": "*LsoV2IPv4", "value": "0", "meaning": "Large Send Offload v2 IPv4 OFF" },
+    { "registryKeyword": "*LsoV2IPv6", "value": "0", "meaning": "Large Send Offload v2 IPv6 OFF" },
+    { "registryKeyword": "*RscIPv4", "value": "0", "meaning": "Receive Segment Coalescing IPv4 OFF" },
+    { "registryKeyword": "*RscIPv6", "value": "0", "meaning": "Receive Segment Coalescing IPv6 OFF" },
+    { "registryKeyword": "*TCPChecksumOffloadIPv4", "value": "0", "meaning": "TCP checksum offload IPv4 OFF" },
+    { "registryKeyword": "*TCPChecksumOffloadIPv6", "value": "0", "meaning": "TCP checksum offload IPv6 OFF" },
+    { "registryKeyword": "*UDPChecksumOffloadIPv4", "value": "0", "meaning": "UDP checksum offload IPv4 OFF" },
+    { "registryKeyword": "*UDPChecksumOffloadIPv6", "value": "0", "meaning": "UDP checksum offload IPv6 OFF" },
+    { "registryKeyword": "*IPChecksumOffloadIPv4", "value": "0", "meaning": "IP checksum offload IPv4 OFF" }
   ],
   "cmdlets": [
     "Disable-NetAdapterLso",
     "Disable-NetAdapterRsc",
-    "Disable-NetAdapterChecksumOffload"
+    "Disable-NetAdapterChecksumOffload",
+    "Set-NetAdapterPowerManagement -AllowComputerToTurnOffDevice Disabled"
   ],
+  "companionScript": "Apply-Lu4EthernetNic.ps1",
+  "rollbackCompanion": "Rollback-Lu4EthernetNic.ps1",
+  "rollbackDefaultsFile": "settings.rollback-defaults.json",
   "successCriteria": {
     "eNet": "OFF",
     "path": "Ethernet",

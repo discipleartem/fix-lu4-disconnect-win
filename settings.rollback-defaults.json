@@ -1,0 +1,55 @@
+{
+  "schema": "lu4-ethernet-nic-rollback-defaults/v1",
+  "role": "rollback-targets",
+  "keywords": [
+    "Lu4", "Lineage", "disconnect", "Realtek", "Ethernet",
+    "LSO", "RSC", "EEE", "GreenEthernet", "checksum", "offload",
+    "rollback", "defaults", "Windows 10", "Windows 11"
+  ],
+  "warning": "Rollback restores typical Realtek/Windows defaults and MAY bring back Lu4 Ethernet disconnect on world :9971.",
+  "adapterHint": "Realtek PCIe GbE Family Controller (RTL8168)",
+  "registryClassPath": "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}",
+  "registry": {
+    "PnPCapabilities": {
+      "type": "DWord",
+      "value": 0,
+      "why": "Allow computer to turn off this device again (typical default)"
+    },
+    "ASPM": {
+      "type": "String",
+      "value": "1",
+      "optional": true,
+      "why": "Typical ASPM enabled (string 1); remove key if driver ignores"
+    }
+  },
+  "advancedProperties": [
+    { "registryKeyword": "*EEE", "value": "1", "meaning": "Energy-Efficient Ethernet ON (typical default)" },
+    { "registryKeyword": "*EEELinkAdvertisement", "value": "1", "meaning": "EEE Link Advertisement ON" },
+    { "registryKeyword": "*GreenEthernet", "value": "1", "meaning": "Green Ethernet ON" },
+    { "registryKeyword": "GreenEthernet", "value": "1", "meaning": "Legacy GreenEthernet ON" },
+    { "registryKeyword": "*SelectiveSuspend", "value": "1", "meaning": "Selective Suspend ON" },
+    { "registryKeyword": "*IdlePowerDown", "value": "1", "meaning": "Idle Power Down ON" },
+    { "registryKeyword": "*LsoV2IPv4", "value": "1", "meaning": "LSO v2 IPv4 ON" },
+    { "registryKeyword": "*LsoV2IPv6", "value": "1", "meaning": "LSO v2 IPv6 ON" },
+    { "registryKeyword": "*RscIPv4", "value": "1", "meaning": "RSC IPv4 ON" },
+    { "registryKeyword": "*RscIPv6", "value": "1", "meaning": "RSC IPv6 ON" },
+    { "registryKeyword": "*TCPChecksumOffloadIPv4", "value": "3", "meaning": "TCP checksum Rx&Tx Enabled (typical)" },
+    { "registryKeyword": "*TCPChecksumOffloadIPv6", "value": "3", "meaning": "TCP checksum Rx&Tx Enabled (typical)" },
+    { "registryKeyword": "*UDPChecksumOffloadIPv4", "value": "3", "meaning": "UDP checksum Rx&Tx Enabled (typical)" },
+    { "registryKeyword": "*UDPChecksumOffloadIPv6", "value": "3", "meaning": "UDP checksum Rx&Tx Enabled (typical)" },
+    { "registryKeyword": "*IPChecksumOffloadIPv4", "value": "3", "meaning": "IP checksum Rx&Tx Enabled (typical)" }
+  ],
+  "cmdlets": [
+    "Enable-NetAdapterLso",
+    "Enable-NetAdapterRsc",
+    "Enable-NetAdapterChecksumOffload",
+    "Set-NetAdapterPowerManagement -AllowComputerToTurnOffDevice Enabled"
+  ],
+  "companionScript": "Rollback-Lu4EthernetNic.ps1",
+  "knownGoodFile": "settings.known-good.json",
+  "notes": [
+    "Values are typical Realtek GbE defaults; driver INF may map DisplayValue differently.",
+    "If a keyword is missing on this INF, skip (idempotent).",
+    "Checksum registry value 3 usually means Rx & Tx Enabled."
+  ]
+}

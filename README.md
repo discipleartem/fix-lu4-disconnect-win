@@ -1,26 +1,27 @@
 # fix-lu4-disconnect-win
 
-Фикс **disconnect Lu4 на Windows Ethernet** (cold path, E-Net OFF) при том же белом публичном IP.
+Фикс **disconnect Lu4 на Windows Ethernet** (cold path, E-Net OFF).
 
-**Один скрипт + эта инструкция.** Один и тот же канон для **Windows 10 и Windows 11**.
+**Один скрипт + эта инструкция.** Один канон для **Windows 10** и **Windows 11**.
 
-Проверен на: **Realtek PCIe GbE Family Controller** (RTL8168), линк **100 Mbps**, публичный IP **`<PUBLIC_WAN_IP>`**.
+Проверен на: **Realtek PCIe GbE Family Controller** (RTL8168), линк **100 Mbps**.
 
 ## Проблема
 
-После выбора сервера в **Servers** и нажатия **OK** игра на **PC Ethernet** устанавливала TCP к миру `:9971` (~2 с Established) и сразу рвала соединение (disconnect).  
-При **том же публичном IP** тот же PC по **USB WiFi** и **ноутбук по WiFi** заходили нормально → это **не бан IP** и не «нужен VPN».
+После выбора сервера в **Servers** и нажатия **OK** игра на **PC Ethernet** устанавливала TCP к миру `:9971` (~2 с Established) и сразу рвала соединение (disconnect).
 
-**E-Net ON** тоже давал успех, но это **другой egress** (`<ENET_EGRESS_IP>`), не фикс Ethernet.
+**Корень:** энергосбережение и HW-offload на **Realtek Ethernet** (EEE, Green, LSO, RSC, checksum, PnP power, Selective Suspend, Idle Power Down, ASPM) — не провайдер и не «бан по IP».
 
-| Путь | Публичный IP | E-Net | Результат |
-|------|--------------|-------|-----------|
-| PC Ethernet cold OFF (**до** фикса) | `<PUBLIC_WAN_IP>` | OFF | **FAIL** — `:9971` ~2 с, disconnect |
-| PC USB WiFi / Notebook WiFi | `<PUBLIC_WAN_IP>` | OFF | **SUCCESS** |
-| PC E-Net ON | `<ENET_EGRESS_IP>` | ON | SUCCESS (*workaround*) |
-| PC Ethernet cold OFF (**после** фикса) | `<PUBLIC_WAN_IP>` | OFF | **SUCCESS** |
+**Доказательство:** на той же машине / той же сети **USB WiFi** заходил нормально, а **Ethernet** падал; после Apply known-good настроек NIC **Ethernet** тоже заходит.
 
-Вывод: ломался **стек Realtek Ethernet (offload / power)**, а не «белый IP провайдера».
+E-Net ON — отдельный обходной путь (другой сетевой путь), **не** этот фикс Ethernet.
+
+| Путь | Результат |
+|------|-----------|
+| PC Ethernet (**до** фикса NIC) | **FAIL** — `:9971` ~2 с, disconnect |
+| PC USB WiFi (тот же PC / сеть) | **SUCCESS** |
+| PC Ethernet (**после** Apply) | **SUCCESS** |
+| E-Net ON | SUCCESS (*workaround*, не фикс NIC) |
 
 ## Запуск (Win10 = Win11)
 
@@ -42,9 +43,9 @@ powershell -ExecutionPolicy Bypass -File .\Apply-Lu4EthernetNic.ps1 -Test
 
 После обновления драйвера Realtek — снова Apply, затем `-Test`.
 
-## Что выключаем (known-good)
+Машинные цели для агентов: [`settings.known-good.json`](settings.known-good.json). Точка входа агента: [`AGENTS.md`](AGENTS.md).
 
-Целевые значения (реестр / Advanced = **0** / Disabled):
+## Что выключаем (known-good)
 
 | Настройка | Цель |
 |-----------|------|
@@ -59,7 +60,7 @@ powershell -ExecutionPolicy Bypass -File .\Apply-Lu4EthernetNic.ps1 -Test
 ### Что это / зачем OFF (по-русски)
 
 **Energy-Efficient Ethernet (EEE) / Green Ethernet**  
-Режимы экономии на линке Ethernet (в UI: *Энергоэффективный / Зелёный / Энергосберегающий Ethernet*). NIC может «подремать» или переключить линк в паузе login→world. Для браузера незаметно; для короткого TCP `:9971` — обрыв ~2 с после Established. WiFi с тем же IP работал — типичный след power-save на Realtek.
+Режимы экономии на линке Ethernet (в UI: *Энергоэффективный / Зелёный / Энергосберегающий Ethernet*). NIC может «подремать» или переключить линк в паузе login→world. Для браузера незаметно; для короткого TCP `:9971` — обрыв ~2 с после Established. USB WiFi на том же PC работал — типичный след power-save на Realtek Ethernet.
 
 **PnPCapabilities = 24**  
 Галка *«Разрешить отключение этого устройства для экономии энергии»* (Power Management). Значение **24** запрещает Windows гасить адаптер. Иначе Ethernet «простаивает» между login и world → drop `:9971`. Скрипт также ставит `AllowComputerToTurnOffDevice=Disabled`.
@@ -95,21 +96,33 @@ Active State Power Management на PCIe-шине адаптера. Выкл., ч
 ## Проверка успеха в Lu4
 
 1. E-Net / E-Global Network — **OFF**.  
-2. Игра через **Ethernet**; публичный IP = ваш белый WAN (`<PUBLIC_WAN_IP>`), **без** hotspot/VPN.  
+2. Игра через **Ethernet**.  
 3. Фракция **Black** → **Recommended** → выбрать **Black** в **Servers** → **только OK** (не выбирать Black ещё раз) → экран **выбора персонажа**.  
 4. TCP к миру **`:9971` Established ≥ 20 с**.
 
-## Чего НЕ делать
+## Do / Don't
 
-- Не считать фиксом hotspot / LTE / VPN / смену IP.  
-- E-Net — обходной путь, не замена фикса Ethernet.  
-- Не резать bitrate стрима «из‑за disconnect» — к Lu4 TCP это не относится.
+**Do**
+
+- Применять `Apply-Lu4EthernetNic.ps1`, затем `-Test`.  
+- После обновления драйвера Realtek — снова Apply + `-Test`.  
+- Проверять вход: Black → Recommended → Black in Servers → OK only.
+
+**Don't**
+
+- Не предлагать hotspot / LTE / VPN / смену сети как «фикс» — корень в NIC, не в «IP».  
+- E-Net — только workaround, не замена фикса Ethernet.  
+- Не включать обратно LSO/RSC/EEE/Green/PnP «для скорости».  
+- Не резать bitrate стрима «из‑за disconnect» — к Lu4 TCP на Ethernet это не относится.
 
 ## Файлы репо
 
 | Файл | Назначение |
 |------|------------|
-| [`Apply-Lu4EthernetNic.ps1`](Apply-Lu4EthernetNic.ps1) | Apply + `-Test` |
-| [`README.md`](README.md) | Эта инструкция |
+| [`Apply-Lu4EthernetNic.ps1`](Apply-Lu4EthernetNic.ps1) | Apply + `-Test` (единственный пользовательский скрипт) |
+| [`README.md`](README.md) | Эта инструкция (единственная для людей) |
+| [`AGENTS.md`](AGENTS.md) | Канон для ИИ-агентов |
+| [`settings.known-good.json`](settings.known-good.json) | Машинные цели NIC (для агентов) |
+| [`.gitignore`](.gitignore) | Локальный шум |
 
-В репозитории нет реальных WAN/LAN IP, SSID, MAC и имён пользователей — только плейсхолдеры. Скрипт не трогает OBS/стрим.
+Без PII: не коммитить реальные IP, SSID, MAC, имена пользователей. Скрипт не трогает OBS/стрим.

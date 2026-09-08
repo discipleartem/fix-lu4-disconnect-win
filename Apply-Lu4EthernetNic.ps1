@@ -1,8 +1,11 @@
+#requires -Version 5.1
 <#
 .SYNOPSIS
   Один скрипт: применить или проверить known-good Realtek Ethernet NIC для Lu4 cold login (Win10+Win11).
 
 .DESCRIPTION
+  Exit codes: 0 = OK / applied; 1 = drift (on -Test), missing adapter, or apply needs admin.
+
   RU — что выключаем и зачем (кратко; подробности в README.md):
     *EEE / Green Ethernet = 0  — энергосбережение линка; NIC «дремлет» → drop TCP :9971 (~2 с)
     PnPCapabilities = 24       — запрет «разрешить отключение устройства для экономии энергии»
@@ -13,12 +16,14 @@
     *IdlePowerDown = 0         — sleep между пакетами на коротком world TCP
     ASPM = 0                   — PCIe Active State Power Management (latency на шине)
 
-  Контекст: Ethernet Realtek disconnect после Servers→OK; тот же <PUBLIC_WAN_IP> на WiFi — OK.
-  E-Net ON — другой egress (<ENET_EGRESS_IP>), не этот фикс.
+  Корень: Realtek Ethernet power/offload (не «бан IP»).
+  Доказательство: USB WiFi на том же PC работал, Ethernet падал; после Apply — Ethernet OK.
+  E-Net ON — обходной путь, не этот фикс.
 
   EN: Idempotent apply of known-good NIC power-save/offload disables for Lu4 world :9971.
+      Root cause = Realtek Ethernet NIC settings, not ISP/IP ban.
       -Test / -Check = read-only drift check (exit 0 OK, 1 drift). Win10 and Win11 same script.
-      Does NOT disable WiFi unless -DisableWifi. Does NOT touch stream / E-Net / public IP.
+      Does NOT disable WiFi unless -DisableWifi. Does NOT touch stream / E-Net.
 
 .PARAMETER Name
   NetAdapter Name (default: auto-detect Realtek Ethernet).
@@ -514,7 +519,7 @@ function Invoke-Lu4NicDriftTest {
 # --- main ---
 Write-Host "=== Apply-Lu4EthernetNic ==="
 Write-Host "Lu4 Realtek Ethernet known-good (EEE/Green/LSO/RSC/checksum/PnPCapabilities=24)"
-Write-Host "Keep your white public WAN IP. Do NOT use hotspot/VPN as 'the fix'."
+Write-Host "Root cause: NIC power-save/offload on Ethernet — not ISP/IP. Hotspot/VPN is not the fix."
 if ($Test) { Write-Host "Mode: -Test (read-only drift check)" }
 Write-Host ""
 $null = Write-Lu4OsBanner
@@ -663,7 +668,7 @@ Write-Host ""
 Write-Host "=== Done ==="
 Write-Host "Verify Lu4: E-Net OFF, Ethernet up → faction Black → Recommended → select Black in Servers → OK → character select."
 Write-Host "(After Black is selected in the server list, press OK only — do not pick Black again.)"
-Write-Host "TCP check: world :9971 Established >= 20s. Public IP should remain your white WAN (<PUBLIC_WAN_IP>)."
+Write-Host "TCP check: world :9971 Established >= 20s."
 Write-Host "After NIC driver update on Win10 or Win11: re-run this script, then: .\Apply-Lu4EthernetNic.ps1 -Test"
 if ($WhatIfPreference) {
     Write-Host "(WhatIf only — no changes written.)"

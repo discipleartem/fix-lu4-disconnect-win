@@ -9,6 +9,10 @@ Lu4 Windows disconnect — NIC power-save/offload (Ethernet PC or WiFi notebook)
 
 -Media Auto|Ethernet|WiFi. Snapshot: %LOCALAPPDATA%\fix-lu4-disconnect-win\snapshot-<GUID>.json
 
+## Manual GUI
+
+MANUAL.md — Windows 10/11 click path: ncpa.cpl → adapter → Power Management + Advanced (Ethernet PC / WiFi notebook). Same known-good targets as scripts.
+
 ## Success
 
 E-Net OFF → Black → Recommended → Black in Servers → OK only → character select.

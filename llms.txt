@@ -11,7 +11,7 @@ Lu4 Windows disconnect — NIC power-save/offload (Ethernet PC or WiFi notebook)
 
 ## Manual GUI
 
-MANUAL.md — Windows 10/11 click path: ncpa.cpl → adapter → Power Management + Advanced (Ethernet PC / WiFi notebook). Same known-good targets as scripts.
+README.md § «Ручная инструкция» — Windows 10/11: ncpa.cpl → adapter → Power Management + Advanced (Ethernet PC / WiFi notebook). Same known-good as scripts.
 
 ## Success
 

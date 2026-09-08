@@ -29,4 +29,4 @@ Black → Recommended → Black in Servers → **OK only** → character select;
 
 ## Files
 
-README.md · **MANUAL.md** (GUI steps Win10/11 + PC Ethernet / notebook WiFi) · Apply / Rollback ps1 · settings.known-good.json · settings.rollback-defaults.json · llms.txt
+README.md (manual GUI + scripts) · Apply / Rollback ps1 · settings.known-good.json · settings.rollback-defaults.json · llms.txt

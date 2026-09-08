@@ -1,27 +1,33 @@
 ﻿#requires -Version 5.1
 <#
 .SYNOPSIS
-  Rollback Realtek Ethernet NIC to typical defaults (undo Apply-Lu4EthernetNic).
+  Rollback Lu4 NIC fix using pre-Apply snapshot (Ethernet or WiFi) — surgical restore.
 
 .DESCRIPTION
-  Restores typical Realtek/Windows defaults: EEE/Green ON, LSO/RSC/checksum ON,
-  SelectiveSuspend/IdlePowerDown ON, ASPM=1, PnPCapabilities=0,
-  AllowComputerToTurnOffDevice Enabled.
-  WARNING: may bring back Lu4 Ethernet disconnect on world :9971.
-  Companion: Apply-Lu4EthernetNic.ps1 | Targets: settings.rollback-defaults.json
-  Exit: 0 = done; 1 = missing adapter or needs admin.
+  Restores ONLY values saved by Apply-Lu4EthernetNic.ps1 in
+  %LOCALAPPDATA%\fix-lu4-disconnect-win\snapshot-<GUID>.json
+  Does not apply blind factory defaults (avoids wiping unrelated NIC settings).
+  Works for desktop Ethernet and notebook WiFi (-Media Auto|Ethernet|WiFi).
+  Exit: 0 = done; 1 = no snapshot / not admin / no adapter.
+
+.PARAMETER Media
+  Auto (default) | Ethernet | WiFi — same selection rules as Apply.
 
 .PARAMETER Name
-  NetAdapter Name (default: auto-detect Realtek Ethernet).
+  NetAdapter Name.
 
 .PARAMETER InterfaceDescription
   Match InterfaceDescription.
 
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\Rollback-Lu4EthernetNic.ps1
+.EXAMPLE
+  powershell -ExecutionPolicy Bypass -File .\Rollback-Lu4EthernetNic.ps1 -Media WiFi
 #>
 [CmdletBinding()]
 param(
+    [ValidateSet("Auto", "Ethernet", "WiFi")]
+    [string]$Media = "Auto",
     [string]$Name,
     [string]$InterfaceDescription
 )
@@ -143,6 +149,115 @@ $script:AdvTargets = @(
     }
 )
 
+# WiFi rollback: типичные «включено» для power-save ключей
+$script:WifiAdvTargets = @(
+    @{
+        RegistryKeyword = "*PowerSaveMode"
+        AltKeywords     = @("PowerSaveMode", "*PMWiFi", "*WiFiPower*", "*WirelessPower*")
+        DisplayNames    = @("*Power Saving*", "*Режим энергосбережения*", "*Энергосбережение*", "*Power Save*")
+        Value           = "1"
+        Why             = "WiFi Power Saving ON (типичный default)"
+    }
+    @{
+        RegistryKeyword = "*DeviceSleepOnDisconnect"
+        AltKeywords     = @("DeviceSleepOnDisconnect")
+        DisplayNames    = @("*Sleep*Disconnect*", "*Сон*отключ*", "*Device Sleep*")
+        Value           = "1"
+        Why             = "Device Sleep On Disconnect ON"
+    }
+    @{
+        RegistryKeyword = "*uAPSDSupport"
+        AltKeywords     = @("*uAPSD*", "uAPSD")
+        DisplayNames    = @("*uAPSD*", "*U-APSD*")
+        Value           = "1"
+        Why             = "uAPSD ON"
+    }
+    @{
+        RegistryKeyword = "*RoamingAggressiveness"
+        AltKeywords     = @("RoamingAggressiveness", "*Roaming*")
+        DisplayNames    = @("*Roaming Aggressiveness*", "*Агрессивность роуминга*")
+        Value           = "2"
+        Why             = "Roaming medium (типично 2)"
+    }
+    @{
+        RegistryKeyword = "*SelectiveSuspend"
+        AltKeywords     = @("SelectiveSuspend")
+        DisplayNames    = @("*Selective Suspend*", "*Выборочная приостановка*")
+        Value           = "1"
+        Why             = "Selective Suspend ON"
+    }
+    @{
+        RegistryKeyword = "*IdlePowerDown"
+        AltKeywords     = @("IdlePowerDown")
+        DisplayNames    = @("*Idle Power*", "*Простой*питан*")
+        Value           = "1"
+        Why             = "Idle Power Down ON"
+    }
+    @{
+        RegistryKeyword = "*LsoV2IPv4"
+        AltKeywords     = @("*LSO*IPv4*")
+        DisplayNames    = @("*Large Send Offload*IPv4*", "*LSO*IPv4*")
+        Value           = "1"
+        Why             = "LSO ON"
+    }
+    @{
+        RegistryKeyword = "*LsoV2IPv6"
+        AltKeywords     = @("*LSO*IPv6*")
+        DisplayNames    = @("*Large Send Offload*IPv6*", "*LSO*IPv6*")
+        Value           = "1"
+        Why             = "LSO v2 IPv6 ON"
+    }
+    @{
+        RegistryKeyword = "*RscIPv4"
+        AltKeywords     = @("*RSC*IPv4*")
+        DisplayNames    = @("*Recv Segment Coalescing*IPv4*", "*RSC*IPv4*")
+        Value           = "1"
+        Why             = "RSC ON"
+    }
+    @{
+        RegistryKeyword = "*RscIPv6"
+        AltKeywords     = @("*RSC*IPv6*")
+        DisplayNames    = @("*Recv Segment Coalescing*IPv6*", "*RSC*IPv6*")
+        Value           = "1"
+        Why             = "RSC IPv6 ON"
+    }
+    @{
+        RegistryKeyword = "*TCPChecksumOffloadIPv4"
+        AltKeywords     = @("*TCPChecksum*IPv4*")
+        DisplayNames    = @("*TCP Checksum Offload*IPv4*")
+        Value           = "3"
+        Why             = "TCP checksum Rx&Tx"
+    }
+    @{
+        RegistryKeyword = "*TCPChecksumOffloadIPv6"
+        AltKeywords     = @("*TCPChecksum*IPv6*")
+        DisplayNames    = @("*TCP Checksum Offload*IPv6*")
+        Value           = "3"
+        Why             = "TCP checksum IPv6 Rx&Tx"
+    }
+    @{
+        RegistryKeyword = "*UDPChecksumOffloadIPv4"
+        AltKeywords     = @("*UDPChecksum*IPv4*")
+        DisplayNames    = @("*UDP Checksum Offload*IPv4*")
+        Value           = "3"
+        Why             = "UDP checksum Rx&Tx"
+    }
+    @{
+        RegistryKeyword = "*UDPChecksumOffloadIPv6"
+        AltKeywords     = @("*UDPChecksum*IPv6*")
+        DisplayNames    = @("*UDP Checksum Offload*IPv6*")
+        Value           = "3"
+        Why             = "UDP checksum IPv6 Rx&Tx"
+    }
+    @{
+        RegistryKeyword = "*IPChecksumOffloadIPv4"
+        AltKeywords     = @("*IPChecksum*")
+        DisplayNames    = @("*IP Checksum Offload*")
+        Value           = "3"
+        Why             = "IP checksum Rx&Tx"
+    }
+)
+
 function Get-Lu4OsInfo {
     # Считать версию ОС
     $envVer = [Environment]::OSVersion.Version
@@ -181,55 +296,96 @@ function Write-Step([string]$Message) {
     Write-Host ("[{0}] {1}" -f (Get-Date -Format "HH:mm:ss"), $Message)
 }
 
-function Resolve-EthernetAdapter {
-    param([string]$Name, [string]$InterfaceDescription)
+function Test-IsWifiAdapter {
+    param($Adapter)
+    # Heuristic: WiFi / Wireless / 802.11
+    return (
+        $Adapter.InterfaceDescription -match "Wireless|Wi-?Fi|802\.11|WLAN" -or
+        $Adapter.Name -match "Wi-?Fi|WLAN|Беспровод" -or
+        $Adapter.MediaType -match "Native 802.11|Wireless"
+    )
+}
+
+function Test-IsEthernetAdapter {
+    param($Adapter)
+    # Heuristic: проводной Ethernet
+    if (Test-IsWifiAdapter $Adapter) { return $false }
+    return (
+        $Adapter.MediaType -eq "802.3" -or
+        $Adapter.InterfaceDescription -match "Ethernet|GbE|LAN|Realtek.*PCIe"
+    )
+}
+
+function Resolve-Lu4Adapter {
+    param(
+        [string]$Media,
+        [string]$Name,
+        [string]$InterfaceDescription
+    )
 
     # Список присутствующих адаптеров
     $all = @(Get-NetAdapter -ErrorAction Stop | Where-Object { $_.Status -ne "Not Present" })
 
-    # Явный выбор по -Name
+    # Явный -Name
     if ($Name) {
         $hit = $all | Where-Object { $_.Name -eq $Name } | Select-Object -First 1
         if (-not $hit) { throw "Adapter Name='$Name' not found." }
-        return $hit
+        return [pscustomobject]@{ Adapter = $hit; MediaKind = $(if (Test-IsWifiAdapter $hit) { "WiFi" } else { "Ethernet" }) }
     }
 
-    # Явный выбор по описанию интерфейса
+    # Явный InterfaceDescription
     if ($InterfaceDescription) {
         $hit = $all | Where-Object { $_.InterfaceDescription -like "*$InterfaceDescription*" } | Select-Object -First 1
         if (-not $hit) { throw "Adapter InterfaceDescription matching '$InterfaceDescription' not found." }
-        return $hit
+        return [pscustomobject]@{ Adapter = $hit; MediaKind = $(if (Test-IsWifiAdapter $hit) { "WiFi" } else { "Ethernet" }) }
     }
 
-    # Авто-поиск Realtek Ethernet
-    $eth = @(
+    $ethPreferred = @(
         $all | Where-Object {
             $_.InterfaceDescription -match "Realtek.*GbE|Realtek.*Ethernet|PCIe GbE" -and
-            $_.InterfaceDescription -notmatch "Wireless|Wi-?Fi|802\.11|Bluetooth"
+            -not (Test-IsWifiAdapter $_)
         }
     )
-    if ($eth.Count -eq 1) { return $eth[0] }
-    if ($eth.Count -gt 1) {
-        Write-Host "Multiple Realtek Ethernet adapters:"
-        $eth | ForEach-Object { Write-Host ("  - Name={0} Desc={1} Status={2}" -f $_.Name, $_.InterfaceDescription, $_.Status) }
-        throw "Pass -Name or -InterfaceDescription to select one."
-    }
-
-    # Fallback: единственный проводной адаптер
-    $wired = @(
-        $all | Where-Object {
-            $_.MediaType -eq "802.3" -or
-            ($_.InterfaceDescription -match "Ethernet|GbE|LAN" -and $_.InterfaceDescription -notmatch "Wireless|Wi-?Fi|802\.11|Bluetooth|Virtual|Hyper-V|vEthernet")
-        }
+    $ethAny = @($all | Where-Object { Test-IsEthernetAdapter $_ })
+    $wifiAny = @(
+        $all | Where-Object { Test-IsWifiAdapter $_ } |
+            Sort-Object { if ($_.Status -eq "Up") { 0 } else { 1 } }, Name
     )
-    if ($wired.Count -eq 1) {
-        Write-Host "WARN: Realtek not matched; using single wired adapter: $($wired[0].Name)"
-        return $wired[0]
+
+    $kind = $Media
+    if ($kind -eq "Auto") {
+        if ($ethPreferred.Count -ge 1 -or $ethAny.Count -ge 1) {
+            $kind = "Ethernet"
+        } elseif ($wifiAny.Count -ge 1) {
+            $kind = "WiFi"
+            Write-Host "Auto: Ethernet not found → using WiFi (notebook path)."
+        } else {
+            throw "Auto: no Ethernet and no WiFi adapter found."
+        }
     }
 
-    Write-Host "Available adapters:"
-    $all | ForEach-Object { Write-Host ("  - Name={0} Desc={1} Status={2}" -f $_.Name, $_.InterfaceDescription, $_.Status) }
-    throw "Could not auto-detect Ethernet. Use -Name or -InterfaceDescription."
+    if ($kind -eq "Ethernet") {
+        if ($ethPreferred.Count -eq 1) {
+            return [pscustomobject]@{ Adapter = $ethPreferred[0]; MediaKind = "Ethernet" }
+        }
+        if ($ethPreferred.Count -gt 1) {
+            throw "Multiple Realtek Ethernet — pass -Name."
+        }
+        if ($ethAny.Count -eq 1) {
+            return [pscustomobject]@{ Adapter = $ethAny[0]; MediaKind = "Ethernet" }
+        }
+        if ($ethAny.Count -gt 1) { throw "Multiple Ethernet — pass -Name." }
+        throw "Ethernet requested but no wired adapter. Use -Media WiFi."
+    }
+
+    if ($kind -eq "WiFi") {
+        if ($wifiAny.Count -eq 0) { throw "WiFi requested but no wireless adapter found." }
+        $up = @($wifiAny | Where-Object { $_.Status -eq "Up" })
+        $pick = if ($up.Count -ge 1) { $up[0] } else { $wifiAny[0] }
+        return [pscustomobject]@{ Adapter = $pick; MediaKind = "WiFi" }
+    }
+
+    throw "Unknown Media='$Media'"
 }
 
 function Get-NicRegPath {
@@ -363,8 +519,8 @@ function Set-AdvOrReg {
 
 # --- main ---
 Write-Host "=== Rollback-Lu4EthernetNic ==="
-Write-Host "Restore typical Realtek Ethernet defaults (undo known-good Apply)."
-Write-Host "WARNING: may bring back Lu4 disconnect on Ethernet world :9971."
+Write-Host "Restore PRE-FIX values from snapshot (Ethernet or WiFi notebook)."
+Write-Host "Does NOT wipe unrelated NIC settings — only keys saved by Apply."
 Write-Host ""
 $null = Write-Lu4OsBanner
 Write-Host ""
@@ -377,49 +533,114 @@ if (-not $isAdmin) {
     exit 1
 }
 
-# Найти Ethernet-адаптер и ветку реестра
-$adapter = Resolve-EthernetAdapter -Name $Name -InterfaceDescription $InterfaceDescription
+# Тот же выбор адаптера, что у Apply (Auto / Ethernet / WiFi)
+$resolved = Resolve-Lu4Adapter -Media $Media -Name $Name -InterfaceDescription $InterfaceDescription
+$adapter = $resolved.Adapter
+$mediaKind = $resolved.MediaKind
+Write-Host ("Target media: {0} | Adapter: {1}" -f $mediaKind, $adapter.Name)
+
 $regPath = Get-NicRegPath -InterfaceGuid ([string]$adapter.InterfaceGuid)
 if (-not $regPath) {
     Write-Host "ERROR: Could not resolve NIC class registry path for $($adapter.InterfaceGuid)"
     exit 1
 }
 
-# Состояние ДО отката
-Show-AdapterState -Adapter $adapter -RegPath $regPath -Label "BEFORE ROLLBACK"
+# Путь снимка, созданного Apply до изменений
+$guidSafe = ($adapter.InterfaceGuid.Trim("{}") -replace "[^A-Fa-f0-9\-]", "")
+$snapDir = Join-Path $env:LOCALAPPDATA "fix-lu4-disconnect-win"
+$snapPath = Join-Path $snapDir ("snapshot-{0}.json" -f $guidSafe)
+
+# Без снимка откат не угадывает «типичные» defaults — чтобы не сбить чужие настройки
+if (-not (Test-Path -LiteralPath $snapPath)) {
+    Write-Host "ERROR: Snapshot not found:"
+    Write-Host "  $snapPath"
+    Write-Host "Run Apply-Lu4EthernetNic.ps1 first (it saves pre-fix values). Refusing blind factory rollback."
+    exit 1
+}
+
+# Прочитать снимок до-фикса
+Write-Step ("Loading snapshot: {0}" -f $snapPath)
+$snap = Get-Content -LiteralPath $snapPath -Raw -Encoding UTF8 | ConvertFrom-Json
+
+Show-AdapterState -Adapter $adapter -RegPath $regPath -Label ("BEFORE ROLLBACK ($mediaKind)")
 
 Write-Host ""
-Write-Step "Restoring typical defaults..."
+Write-Step "Restoring ONLY snapshot previousValue (surgical)..."
 
-# Включить advanced-свойства к типичным defaults
-foreach ($t in $script:AdvTargets) {
+# Вернуть каждое advanced/reg свойство к previousValue из снимка
+foreach ($p in @($snap.properties)) {
+    if (-not $p.present) {
+        Write-Step ("SKIP {0} (was absent)" -f $p.registryKeyword)
+        continue
+    }
+    $prev = [string]$p.previousValue
+    if ($null -eq $p.previousValue -or $prev -eq "") {
+        Write-Step ("SKIP {0} (empty previous)" -f $p.registryKeyword)
+        continue
+    }
     try {
-        Set-AdvOrReg -AdapterName $adapter.Name -RegPath $regPath -Target $t
+        # Попытка через AdvancedProperty API
+        $adv = Get-NetAdapterAdvancedProperty -Name $adapter.Name -RegistryKeyword $p.registryKeyword -ErrorAction SilentlyContinue
+        if ($adv) {
+            $cur = ($adv.RegistryValue -join ",")
+            if ($cur -eq $prev) {
+                Write-Step ("OK already ADV {0}={1}" -f $p.registryKeyword, $prev)
+            } else {
+                Set-NetAdapterAdvancedProperty -Name $adapter.Name -RegistryKeyword $p.registryKeyword -RegistryValue $prev -NoRestart -ErrorAction Stop
+                Write-Step ("RESTORE ADV {0}={1}" -f $p.registryKeyword, $prev)
+            }
+        } else {
+            # Fallback в реестр Class
+            $had = $null
+            try { $had = (Get-ItemProperty -Path $regPath -Name $p.registryKeyword -ErrorAction Stop).($p.registryKeyword) } catch {}
+            if ([string]$had -eq $prev) {
+                Write-Step ("OK already REG {0}={1}" -f $p.registryKeyword, $prev)
+            } else {
+                New-ItemProperty -Path $regPath -Name $p.registryKeyword -PropertyType String -Value $prev -Force -ErrorAction Stop | Out-Null
+                Write-Step ("RESTORE REG {0}={1}" -f $p.registryKeyword, $prev)
+            }
+        }
     } catch {
-        Write-Step ("FAIL {0}: {1}" -f $t.RegistryKeyword, $_)
+        Write-Step ("FAIL restore {0}: {1}" -f $p.registryKeyword, $_)
     }
 }
 
-# PnPCapabilities=0 — снова разрешить отключение для экономии энергии
-$oldPnP = Get-RegValueSafe -Path $regPath -Name "PnPCapabilities"
-$pnpMsg = "PnPCapabilities '{0}' -> {1}" -f $(if ($null -eq $oldPnP -or $oldPnP -eq "") { "<empty>" } else { $oldPnP }), $script:TargetPnPCapabilities
-if ([string]$oldPnP -eq [string]$script:TargetPnPCapabilities) {
-    Write-Step ("OK already {0}" -f $pnpMsg)
-} else {
-    New-ItemProperty -Path $regPath -Name PnPCapabilities -PropertyType DWord -Value $script:TargetPnPCapabilities -Force | Out-Null
-    Write-Step ("SET {0}" -f $pnpMsg)
+# PnPCapabilities из снимка
+if ($snap.registry -and $snap.registry.PnPCapabilities) {
+    $prevPnP = $snap.registry.PnPCapabilities.previous
+    if ($null -ne $prevPnP -and [string]$prevPnP -ne "") {
+        try {
+            $val = [int]$prevPnP
+            New-ItemProperty -Path $regPath -Name PnPCapabilities -PropertyType DWord -Value $val -Force | Out-Null
+            Write-Step ("RESTORE PnPCapabilities={0}" -f $val)
+        } catch {
+            Write-Step ("FAIL PnPCapabilities: {0}" -f $_)
+        }
+    } else {
+        # Если до фикса ключа не было — удалить наш 24
+        try {
+            Remove-ItemProperty -Path $regPath -Name PnPCapabilities -ErrorAction Stop
+            Write-Step "REMOVE PnPCapabilities (was empty before Apply)"
+        } catch {
+            Write-Step ("PnPCapabilities cleanup: {0}" -f $_)
+        }
+    }
 }
 
-# ASPM=1 — типичный enabled
-$oldAspm = Get-RegValueSafe -Path $regPath -Name "ASPM"
-if ($oldAspm -eq "1") {
-    Write-Step "OK already ASPM=1"
-} else {
-    New-ItemProperty -Path $regPath -Name ASPM -PropertyType String -Value "1" -Force | Out-Null
-    Write-Step "SET ASPM=1"
+# ASPM из снимка
+if ($snap.registry -and $snap.registry.ASPM -and $snap.registry.ASPM.present) {
+    $prevAspm = [string]$snap.registry.ASPM.previous
+    if ($prevAspm -ne "") {
+        try {
+            New-ItemProperty -Path $regPath -Name ASPM -PropertyType String -Value $prevAspm -Force | Out-Null
+            Write-Step ("RESTORE ASPM={0}" -f $prevAspm)
+        } catch {
+            Write-Step ("FAIL ASPM: {0}" -f $_)
+        }
+    }
 }
 
-# Если адаптер Disabled — включить перед Enable-cmdlets
+# Включить адаптер если Disabled
 try {
     if ($adapter.Status -eq "Disabled") {
         Enable-NetAdapter -Name $adapter.Name -Confirm:$false -ErrorAction Stop
@@ -431,25 +652,46 @@ try {
     Write-Step ("Enable-NetAdapter: {0}" -f $_)
 }
 
-# Cmdlet: включить Large Send Offload
-try {
-    Enable-NetAdapterLso -Name $adapter.Name -Confirm:$false -ErrorAction Stop
-    Write-Step "Enable-NetAdapterLso OK"
-} catch { Write-Step ("Enable-NetAdapterLso: {0}" -f $_) }
+# Cmdlet LSO/RSC/Checksum по снимку (если знали предыдущее состояние)
+if ($snap.cmdlets) {
+    $lso = $snap.cmdlets.Lso
+    if ($null -ne $lso -and $null -ne $lso.ipv4) {
+        try {
+            if ($lso.ipv4 -or $lso.ipv6) {
+                Enable-NetAdapterLso -Name $adapter.Name -Confirm:$false -ErrorAction Stop
+                Write-Step "RESTORE Enable-NetAdapterLso (was enabled)"
+            } else {
+                Disable-NetAdapterLso -Name $adapter.Name -Confirm:$false -ErrorAction Stop
+                Write-Step "RESTORE Disable-NetAdapterLso (was disabled)"
+            }
+        } catch { Write-Step ("LSO restore: {0}" -f $_) }
+    }
+    $rsc = $snap.cmdlets.Rsc
+    if ($null -ne $rsc -and $null -ne $rsc.ipv4) {
+        try {
+            if ($rsc.ipv4 -or $rsc.ipv6) {
+                Enable-NetAdapterRsc -Name $adapter.Name -Confirm:$false -ErrorAction Stop
+                Write-Step "RESTORE Enable-NetAdapterRsc (was enabled)"
+            } else {
+                Disable-NetAdapterRsc -Name $adapter.Name -Confirm:$false -ErrorAction Stop
+                Write-Step "RESTORE Disable-NetAdapterRsc (was disabled)"
+            }
+        } catch { Write-Step ("RSC restore: {0}" -f $_) }
+    }
+    if ($null -ne $snap.cmdlets.ChecksumPresent) {
+        try {
+            if ($snap.cmdlets.ChecksumPresent) {
+                Enable-NetAdapterChecksumOffload -Name $adapter.Name -Confirm:$false -ErrorAction Stop
+                Write-Step "RESTORE Enable-NetAdapterChecksumOffload"
+            } else {
+                Disable-NetAdapterChecksumOffload -Name $adapter.Name -Confirm:$false -ErrorAction Stop
+                Write-Step "RESTORE Disable-NetAdapterChecksumOffload"
+            }
+        } catch { Write-Step ("Checksum restore: {0}" -f $_) }
+    }
+}
 
-# Cmdlet: включить Receive Segment Coalescing
-try {
-    Enable-NetAdapterRsc -Name $adapter.Name -Confirm:$false -ErrorAction Stop
-    Write-Step "Enable-NetAdapterRsc OK"
-} catch { Write-Step ("Enable-NetAdapterRsc: {0}" -f $_) }
-
-# Cmdlet: включить checksum offload
-try {
-    Enable-NetAdapterChecksumOffload -Name $adapter.Name -Confirm:$false -ErrorAction Stop
-    Write-Step "Enable-NetAdapterChecksumOffload OK"
-} catch { Write-Step ("Enable-NetAdapterChecksumOffload: {0}" -f $_) }
-
-# Cmdlet: снова разрешить Windows гасить NIC
+# Power management: после отката снова разрешить (типично до фикса) — только если снимок не хранит иначе
 try {
     Set-NetAdapterPowerManagement -Name $adapter.Name `
         -AllowComputerToTurnOffDevice Enabled `
@@ -457,13 +699,13 @@ try {
     Write-Step "Set-NetAdapterPowerManagement AllowComputerToTurnOffDevice=Enabled"
 } catch { Write-Step ("Set-NetAdapterPowerManagement: {0}" -f $_) }
 
-# Состояние ПОСЛЕ отката
 $adapter = Get-NetAdapter -Name $adapter.Name -ErrorAction SilentlyContinue
 if ($adapter) {
-    Show-AdapterState -Adapter $adapter -RegPath $regPath -Label "AFTER ROLLBACK"
+    Show-AdapterState -Adapter $adapter -RegPath $regPath -Label ("AFTER ROLLBACK ($mediaKind)")
 }
 
 Write-Host ""
 Write-Host "=== Done ==="
-Write-Host "Typical defaults restored. Re-apply fix: .\Apply-Lu4EthernetNic.ps1"
+Write-Host ("Rolled back from snapshot: {0}" -f $snapPath)
+Write-Host "Re-apply: .\Apply-Lu4EthernetNic.ps1  (-Media WiFi on notebooks)"
 exit 0

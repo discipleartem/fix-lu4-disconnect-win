@@ -1,22 +1,14 @@
 # fix-lu4-disconnect-win
 
-Lu4 Windows Ethernet disconnect fix — Realtek NIC power-save/offload (NOT ISP/white IP).
+Lu4 Windows disconnect — NIC power-save/offload (Ethernet PC or WiFi notebook).
 
-## Scripts (exactly 2)
+## Scripts (2)
 
-- Apply-Lu4EthernetNic.ps1 — known-good: EEE/Green OFF, PnPCapabilities=24, LSO/RSC/checksum OFF, SelectiveSuspend/IdlePowerDown OFF, ASPM=0
-- Rollback-Lu4EthernetNic.ps1 — typical defaults back (may restore disconnect)
+- Apply-Lu4EthernetNic.ps1 — read → snapshot → surgical known-good
+- Rollback-Lu4EthernetNic.ps1 — restore snapshot previousValue only
 
-No -Test, no -WhatIf. Run elevated. Win10 = Win11.
-
-## Evidence
-
-Same PC/network: USB WiFi OK, Ethernet FAIL before Apply; Ethernet OK after Apply.
+-Media Auto|Ethernet|WiFi. Snapshot: %LOCALAPPDATA%\fix-lu4-disconnect-win\snapshot-<GUID>.json
 
 ## Success
 
-E-Net OFF, Ethernet → Black → Recommended → Black in Servers → OK only → character select; :9971 Established ≥ 20s.
-
-## Files
-
-README.md (humans) · AGENTS.md · settings.known-good.json · settings.rollback-defaults.json
+E-Net OFF → Black → Recommended → Black in Servers → OK only → character select.

@@ -124,7 +124,7 @@ foreach ($t in $script:AdvTargets) {
     }
 }
 
-# PnPCapabilities=24
+# PnPCapabilities=24 — forbid "allow computer to turn off this device" (Lu4 :9971 drop if NIC sleeps)
 $oldPnP = Get-RegValueSafe -Path $regPath -Name "PnPCapabilities"
 $pnpMsg = "PnPCapabilities '{0}' -> {1} (disable allow-computer-to-turn-off-this-device)" -f $(if ($null -eq $oldPnP -or $oldPnP -eq "") { "<empty>" } else { $oldPnP }), $script:TargetPnPCapabilities
 if ([string]$oldPnP -eq [string]$script:TargetPnPCapabilities) {
@@ -136,12 +136,12 @@ if ([string]$oldPnP -eq [string]$script:TargetPnPCapabilities) {
     Write-Step ("SET {0}" -f $pnpMsg)
 }
 
-# ASPM=0 (PCIe Active State Power Management off)
+# ASPM=0 — PCIe Active State Power Management off (bus sleep can add wake latency on world TCP)
 $oldAspm = Get-RegValueSafe -Path $regPath -Name "ASPM"
 if ($oldAspm -eq "0") {
     Write-Step "OK already ASPM=0"
 } elseif ($WhatIfPreference) {
-    Write-Step "WhatIf: ASPM -> 0 (PCIe link power management)"
+    Write-Step "WhatIf: ASPM -> 0 (PCIe link power management OFF for Lu4 cold path)"
 } elseif ($PSCmdlet.ShouldProcess($regPath, "ASPM=0")) {
     New-ItemProperty -Path $regPath -Name ASPM -PropertyType String -Value "0" -Force | Out-Null
     Write-Step "SET ASPM=0"

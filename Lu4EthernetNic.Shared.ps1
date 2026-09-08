@@ -7,117 +7,119 @@
 #>
 
 $script:NicClassPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}"
-# PnPCapabilities=24 (0x18): bit3=do not allow computer to turn off this device; bit4=no wake.
+# PnPCapabilities=24 (0x18): forbid "allow computer to turn off this device" (+ related wake bits in known-good).
+# RU docs: docs/SETTINGS-EXPLAINED.ru.md
 $script:TargetPnPCapabilities = 24
 
 # Registry keywords from known-good capture (ethernet-fix SUCCESS 2026-09-08).
 # DisplayNamePatterns: RU/EN UI labels for Get-NetAdapterAdvancedProperty fallback when keyword missing.
-# WHY: Lu4 world TCP :9971 Established ~2s then drop after server OK on Ethernet cold path.
+# WHY one-liners for Apply logs; full RU explanations: docs/SETTINGS-EXPLAINED.ru.md
+# Context: Lu4 world TCP :9971 Established ~2s then drop after server OK on Ethernet cold path.
 $script:AdvTargets = @(
     @{
         RegistryKeyword = "*EEE"
         AltKeywords     = @("EEE", "*EnergyEfficientEthernet")
         DisplayNames    = @("*Energy-Efficient Ethernet*", "*Energy Efficient Ethernet*", "*Энергоэффективный Ethernet*", "*EEE*")
         Value           = "0"
-        Why             = "Energy-Efficient Ethernet — NIC link power save can stall/reset short TCP bursts at world entry"
+        Why             = "EEE OFF — NIC link power-save can stall/reset Lu4 world TCP :9971 (~2s drop on Ethernet)"
     }
     @{
         RegistryKeyword = "*EEELinkAdvertisement"
         AltKeywords     = @("EEELinkAdvertisement")
         DisplayNames    = @("*EEE Link Advertisement*", "*EEE*Advert*", "*Реклама*EEE*", "*Объявлен*EEE*")
         Value           = "0"
-        Why             = "EEE advertisement companion — keep EEE fully off"
+        Why             = "EEE Link Advertisement OFF — companion to full EEE disable"
     }
     @{
         RegistryKeyword = "*GreenEthernet"
         AltKeywords     = @("GreenEthernet", "*Green*")
         DisplayNames    = @("*Green Ethernet*", "*Зелёный Ethernet*", "*Зеленый Ethernet*", "*Энергосберегающий Ethernet*")
         Value           = "0"
-        Why             = "Green Ethernet / cable-length power save — same class of NIC power gating"
+        Why             = "Green Ethernet OFF — Realtek cable/power gating; same class as EEE vs short :9971"
     }
     @{
         RegistryKeyword = "GreenEthernet"
         AltKeywords     = @()
         DisplayNames    = @()
         Value           = "0"
-        Why             = "Legacy GreenEthernet key (some Realtek INF use non-star name)"
+        Why             = "Legacy GreenEthernet=0 (some Realtek INF use non-star keyword)"
     }
     @{
         RegistryKeyword = "*SelectiveSuspend"
         AltKeywords     = @("SelectiveSuspend", "*SS*")
         DisplayNames    = @("*Selective Suspend*", "*Выборочная приостановка*", "*Селективн*")
         Value           = "0"
-        Why             = "USB/PCIe selective suspend — device sleep during idle between login→world"
+        Why             = "Selective Suspend OFF — NIC sleep in login→world gap can drop :9971"
     }
     @{
         RegistryKeyword = "*IdlePowerDown"
         AltKeywords     = @("IdlePowerDown")
         DisplayNames    = @("*Idle Power*", "*Простой*питан*", "*Idle*Down*")
         Value           = "0"
-        Why             = "Idle power-down — NIC sleep between packets"
+        Why             = "Idle Power Down OFF — sleep between packets breaks short world handshake"
     }
     @{
         RegistryKeyword = "*LsoV2IPv4"
         AltKeywords     = @("*LSO*IPv4*", "*LsoV2*IPv4*")
         DisplayNames    = @("*Large Send Offload*v2*IPv4*", "*LSO*v2*IPv4*", "*Большой объем отправки*IPv4*", "*Большой объём отправки*IPv4*")
         Value           = "0"
-        Why             = "Large Send Offload v2 IPv4 — HW segmentation can corrupt/delay game TCP"
+        Why             = "LSO v2 IPv4 OFF — HW segmentation can corrupt/delay game TCP on Realtek"
     }
     @{
         RegistryKeyword = "*LsoV2IPv6"
         AltKeywords     = @("*LSO*IPv6*", "*LsoV2*IPv6*")
         DisplayNames    = @("*Large Send Offload*v2*IPv6*", "*LSO*v2*IPv6*", "*Большой объем отправки*IPv6*", "*Большой объём отправки*IPv6*")
         Value           = "0"
-        Why             = "Large Send Offload v2 IPv6 — same"
+        Why             = "LSO v2 IPv6 OFF — same Realtek HW-segmentation risk as IPv4"
     }
     @{
         RegistryKeyword = "*RscIPv4"
         AltKeywords     = @("*RSC*IPv4*", "*RecvSegmentCoalescing*IPv4*")
         DisplayNames    = @("*Recv Segment Coalescing*IPv4*", "*Receive Segment Coalescing*IPv4*", "*RSC*IPv4*", "*Объединение сегментов*IPv4*")
         Value           = "0"
-        Why             = "Receive Segment Coalescing IPv4 — coalesce RX can break timing-sensitive game TCP"
+        Why             = "RSC IPv4 OFF — RX coalesce can break timing-sensitive Lu4 :9971"
     }
     @{
         RegistryKeyword = "*RscIPv6"
         AltKeywords     = @("*RSC*IPv6*", "*RecvSegmentCoalescing*IPv6*")
         DisplayNames    = @("*Recv Segment Coalescing*IPv6*", "*Receive Segment Coalescing*IPv6*", "*RSC*IPv6*", "*Объединение сегментов*IPv6*")
         Value           = "0"
-        Why             = "Receive Segment Coalescing IPv6 — same"
+        Why             = "RSC IPv6 OFF — same RX-coalesce risk as IPv4"
     }
     @{
         RegistryKeyword = "*TCPChecksumOffloadIPv4"
         AltKeywords     = @("*TCPChecksum*IPv4*")
         DisplayNames    = @("*TCP Checksum Offload*IPv4*", "*TCP*контрольной суммы*IPv4*", "*Проверка контрольной суммы TCP*IPv4*")
         Value           = "0"
-        Why             = "TCP checksum offload IPv4 — HW checksum bugs on some Realtek drivers"
+        Why             = "TCP checksum OFF IPv4 — HW checksum bugs on some Realtek drivers"
     }
     @{
         RegistryKeyword = "*TCPChecksumOffloadIPv6"
         AltKeywords     = @("*TCPChecksum*IPv6*")
         DisplayNames    = @("*TCP Checksum Offload*IPv6*", "*TCP*контрольной суммы*IPv6*", "*Проверка контрольной суммы TCP*IPv6*")
         Value           = "0"
-        Why             = "TCP checksum offload IPv6"
+        Why             = "TCP checksum OFF IPv6 — batch with IPv4 checksum disable"
     }
     @{
         RegistryKeyword = "*UDPChecksumOffloadIPv4"
         AltKeywords     = @("*UDPChecksum*IPv4*")
         DisplayNames    = @("*UDP Checksum Offload*IPv4*", "*UDP*контрольной суммы*IPv4*", "*Проверка контрольной суммы UDP*IPv4*")
         Value           = "0"
-        Why             = "UDP checksum offload IPv4 (applied as part of working batch)"
+        Why             = "UDP checksum OFF IPv4 — part of known-good offload batch"
     }
     @{
         RegistryKeyword = "*UDPChecksumOffloadIPv6"
         AltKeywords     = @("*UDPChecksum*IPv6*")
         DisplayNames    = @("*UDP Checksum Offload*IPv6*", "*UDP*контрольной суммы*IPv6*", "*Проверка контрольной суммы UDP*IPv6*")
         Value           = "0"
-        Why             = "UDP checksum offload IPv6"
+        Why             = "UDP checksum OFF IPv6 — part of known-good offload batch"
     }
     @{
         RegistryKeyword = "*IPChecksumOffloadIPv4"
         AltKeywords     = @("*IPChecksumOffload*", "*IPChecksum*")
         DisplayNames    = @("*IP Checksum Offload*", "*IP*контрольной суммы*", "*Проверка контрольной суммы IP*")
         Value           = "0"
-        Why             = "IP checksum offload IPv4"
+        Why             = "IP checksum OFF IPv4 — part of known-good offload batch"
     }
 )
 

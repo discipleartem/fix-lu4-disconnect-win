@@ -37,6 +37,7 @@
 
 Почему: при входе в мир Lu4 короткий чувствительный TCP к `:9971`; энергосбережение и HW-offload на Realtek давали drop на Ethernet, тогда как WiFi с тем же IP работал.
 
+Подробно «что это / зачем выключаем» (по-русски): [`docs/SETTINGS-EXPLAINED.ru.md`](docs/SETTINGS-EXPLAINED.ru.md).  
 Снимок: [`good-ethernet-settings.example.txt`](good-ethernet-settings.example.txt).
 
 ## Скрипты (один канон для Win10 + Win11)
